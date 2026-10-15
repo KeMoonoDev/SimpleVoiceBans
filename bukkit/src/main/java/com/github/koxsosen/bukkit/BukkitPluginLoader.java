@@ -125,19 +125,12 @@ public class BukkitPluginLoader extends JavaPlugin implements AbstractPlatform<S
     }
 
     public boolean checkIfBungee() {
-        boolean isPaper;
         boolean isVelocity = false;
-        try {
-            Class.forName("io.papermc.paper.entity");
-            isPaper = true;
-        } catch (ClassNotFoundException e) {
-            isPaper = false;
-        }
 
-        if (isPaper) {
-            try {
-                isVelocity = getServer().spigot().getPaperConfig().getConfigurationSection("proxies").getConfigurationSection("velocity").getBoolean("enabled");
-            } catch (NullPointerException ignored) { }
+        try {
+            isVelocity = getServer().spigot().getPaperConfig().getConfigurationSection("proxies").getConfigurationSection("velocity").getBoolean("enabled");
+        } catch (Exception exception) {
+            getPluginLogger().info("Exception while checking if running Velocity. If you aren't using Paper, this can be safely ignored.\n" + exception);
         }
 
         return getServer().spigot().getConfig().getConfigurationSection("settings").getBoolean("bungeecord") || isVelocity;
