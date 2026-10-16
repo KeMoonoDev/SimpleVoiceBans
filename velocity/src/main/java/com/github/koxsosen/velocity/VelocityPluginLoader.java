@@ -1,12 +1,15 @@
 package com.github.koxsosen.velocity;
 
 import com.github.koxsosen.common.LibertyBansApiHelper;
+import com.github.koxsosen.common.PunishmentPlayerType;
 import com.github.koxsosen.common.abstraction.AbstractPlatform;
 import com.github.koxsosen.common.abstraction.Constants;
 import com.github.koxsosen.common.abstraction.MessageSender;
 import com.github.koxsosen.common.abstraction.ServerType;
 import com.google.inject.Inject;
 import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.LoginEvent;
+import com.velocitypowered.api.event.player.ServerConnectedEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
@@ -19,6 +22,7 @@ import org.slf4j.Logger;
 import space.arim.libertybans.api.LibertyBans;
 import space.arim.omnibus.Omnibus;
 import space.arim.omnibus.OmnibusProvider;
+import space.arim.omnibus.util.concurrent.ReactionStage;
 
 import java.net.InetAddress;
 import java.util.*;
@@ -103,6 +107,25 @@ public class VelocityPluginLoader implements AbstractPlatform<ProxyServer, Playe
 
         getServer().getChannelRegistrar().register(IDENTIFIER);
         getServer().getEventManager().register(this, new MessageReceiver());
+    }
+
+    // Resyncs the mute state when the player logs in.
+    // It would previously de-sync if a player left, got muted, and then the player joined again.
+    @Subscribe
+    public void onLoginEvent(ServerConnectedEvent event) {
+        getLogger().info(event.getPlayer().getUsername() + "has logged in");
+        PunishmentPlayerType punishmentPlayerType = new PunishmentPlayerType(event.getPlayer().getUniqueId(), event.getPlayer().getRemoteAddress().getAddress());
+        ReactionStage<Integer> isMuted = getLibertyBansApiHelper().checkMuted(getApi(), punishmentPlayerType);
+
+        isMuted.thenAcceptAsync(mutedState -> {
+                    getLogger().info(mutedState.toString());
+                    getLogger().info("Muted state for " + event.getPlayer().getUsername() + ": " + mutedState);
+                    getMessageSender().sendPluginMessage(event.getPlayer().getUniqueId(), getPlatform(), new PunishmentPlayerType(punishmentPlayerType.getUuid(), punishmentPlayerType.getInetAddress(), mutedState));
+                })
+                .exceptionally(ex -> {
+                    getLogger().info(Constants.getErrPluginMessage() + ex);
+                    return null;
+                });
     }
 
     @Subscribe
